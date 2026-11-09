@@ -1,12 +1,8 @@
-
+python
 import streamlit as st
 from groq import Groq
 from supabase import create_client
 from datetime import datetime, timezone
-
-# ==================================
-# CONFIGURATION
-# ==================================
 
 st.set_page_config(
     page_title="MyAI Pro",
@@ -14,40 +10,33 @@ st.set_page_config(
     layout="wide"
 )
 
+# CONFIGURATION
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
     db = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 except Exception:
     st.error("პარამეტრები ვერ მოიძებნა. შეამოწმე Streamlit Secrets.")
     st.stop()
 
-# ==================================
 # SESSION
-# ==================================
-
 for key, default in {
     "user": None,
     "active_chat": None,
+    "access_token": None,
+    "refresh_token": None
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
 
 def clear_login():
-    for key in [
-        "user",
-        "active_chat",
-        "access_token",
-        "refresh_token"
-    ]:
+    for key in ["user", "active_chat", "access_token", "refresh_token"]:
         st.session_state.pop(key, None)
 
 
-# Restore Supabase session
+# RESTORE SESSION
 if st.session_state.get("access_token"):
     try:
         db.auth.set_session(
@@ -55,21 +44,14 @@ if st.session_state.get("access_token"):
             st.session_state.refresh_token
         )
         session = db.auth.get_session()
-
         if session and session.user:
             st.session_state.user = session.user.id
-            st.session_state.access_token = session.access_token
-            st.session_state.refresh_token = session.refresh_token
         else:
             clear_login()
-
     except Exception:
         clear_login()
 
-# ==================================
 # DESIGN
-# ==================================
-
 st.markdown("""
 <style>
 .stApp {
@@ -116,12 +98,8 @@ div[data-testid="stChatMessage"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ==================================
 # AUTHENTICATION
-# ==================================
-
 if not st.session_state.user:
-
     st.markdown("""
     <div class="hero">
         <h1>🤖 MyAI Pro</h1>
@@ -130,23 +108,13 @@ if not st.session_state.user:
     </div>
     """, unsafe_allow_html=True)
 
-    login_tab, register_tab = st.tabs([
-        "🔐 შესვლა",
-        "✨ რეგისტრაცია"
-    ])
+    login_tab, register_tab = st.tabs(["🔐 შესვლა", "✨ რეგისტრაცია"])
 
     with login_tab:
-
         with st.form("login_form"):
             email = st.text_input("ელფოსტა")
-            password = st.text_input(
-                "პაროლი",
-                type="password"
-            )
-            submit = st.form_submit_button(
-                "შესვლა",
-                use_container_width=True
-            )
+            password = st.text_input("პაროლი", type="password")
+            submit = st.form_submit_button("შესვლა", use_container_width=True)
 
         if submit:
             try:
@@ -154,83 +122,48 @@ if not st.session_state.user:
                     "email": email.strip(),
                     "password": password
                 })
-
                 st.session_state.user = result.user.id
                 st.session_state.access_token = result.session.access_token
                 st.session_state.refresh_token = result.session.refresh_token
-
                 st.success("წარმატებით შეხვედით!")
                 st.rerun()
-
             except Exception:
                 st.error("ელფოსტა ან პაროლი არასწორია.")
 
     with register_tab:
-
         with st.form("register_form"):
-            email = st.text_input(
-                "ელფოსტა",
-                key="register_email"
-            )
-            password = st.text_input(
-                "პაროლი",
-                type="password",
-                key="register_password"
-            )
-            confirm = st.text_input(
-                "გაიმეორე პაროლი",
-                type="password"
-            )
-
-            submit = st.form_submit_button(
-                "ანგარიშის შექმნა",
-                use_container_width=True
-            )
+            email = st.text_input("ელფოსტა", key="register_email")
+            password = st.text_input("პაროლი", type="password", key="register_password")
+            confirm = st.text_input("გაიმეორე პაროლი", type="password")
+            submit = st.form_submit_button("ანგარიშის შექმნა", use_container_width=True)
 
         if submit:
-
             if not email.strip() or not password:
                 st.warning("შეავსე ყველა ველი.")
-
             elif password != confirm:
                 st.error("პაროლები არ ემთხვევა.")
-
             elif len(password) < 8:
                 st.error("პაროლი მინიმუმ 8 სიმბოლო უნდა იყოს.")
-
             else:
                 try:
                     result = db.auth.sign_up({
                         "email": email.strip(),
                         "password": password
                     })
-
                     if result.session:
                         st.session_state.user = result.user.id
                         st.session_state.access_token = result.session.access_token
                         st.session_state.refresh_token = result.session.refresh_token
-
                         st.success("ანგარიში შეიქმნა!")
                         st.rerun()
-
                     else:
-                        st.success(
-                            "ანგარიში შეიქმნა! "
-                            "შეამოწმე ელფოსტა და დაადასტურე ანგარიში."
-                        )
-
+                        st.success("ანგარიში შეიქმნა! შეამოწმე ელფოსტა.")
                 except Exception:
-                    st.error(
-                        "რეგისტრაცია ვერ შესრულდა. "
-                        "შეამოწმე ელფოსტა ან სცადე მოგვიანებით."
-                    )
+                    st.error("რეგისტრაცია ვერ შესრულდა. სცადე მოგვიანებით.")
 
     st.stop()
 
-# ==================================
 # USER DATABASE
-# ==================================
-
 USER_ID = st.session_state.user
 
 
@@ -254,7 +187,6 @@ def create_chat():
             "content": "გამარჯობა! 👋 მე MyAI Pro ვარ. რით შემიძლია დაგეხმარო?"
         }]
     }).execute()
-
     st.session_state.active_chat = result.data[0]["id"]
 
 
@@ -263,52 +195,34 @@ def update_chat(chat_id, title, messages):
         "title": title,
         "messages": messages,
         "updated_at": datetime.now(timezone.utc).isoformat()
-    }).eq(
-        "id", chat_id
-    ).eq(
-        "user_id", USER_ID
-    ).execute()
+    }).eq("id", chat_id).eq("user_id", USER_ID).execute()
 
 
 def delete_chat(chat_id):
     db.table("chats").delete().eq(
         "id", chat_id
-    ).eq(
-        "user_id", USER_ID
-    ).execute()
+    ).eq("user_id", USER_ID).execute()
 
 
-# ==================================
 # LOAD CHATS
-# ==================================
-
 try:
     chats = load_chats()
-
     if not chats:
         create_chat()
         chats = load_chats()
 
     chat_ids = [chat["id"] for chat in chats]
-
     if st.session_state.active_chat not in chat_ids:
         st.session_state.active_chat = chats[0]["id"]
-
 except Exception:
-    st.error("ჩატების ჩატვირთვა ვერ მოხერხდა.")
+    st.error("ჩატების ჩატვირთვა ვერ მოხერხდა. შეამოწმე Supabase ცხრილი და RLS.")
     st.stop()
 
-# ==================================
 # SIDEBAR
-# ==================================
-
 with st.sidebar:
-
     st.markdown("## 🤖 MyAI Pro")
     st.caption("YOUR PERSONAL AI ASSISTANT")
-
     st.divider()
-
     st.caption("👤 პირადი ანგარიში")
 
     if st.button("＋ ახალი საუბარი", use_container_width=True):
@@ -319,24 +233,17 @@ with st.sidebar:
             st.error("ჩატის შექმნა ვერ მოხერხდა.")
 
     st.markdown("### 💬 ჩემი საუბრები")
-
     chats = load_chats()
 
     selected_id = st.selectbox(
         "აირჩიე საუბარი",
         options=[chat["id"] for chat in chats],
         index=next(
-            (
-                i for i, chat in enumerate(chats)
-                if chat["id"] == st.session_state.active_chat
-            ),
-            0
+            (i for i, chat in enumerate(chats)
+             if chat["id"] == st.session_state.active_chat), 0
         ),
         format_func=lambda chat_id: next(
-            (
-                chat["title"] for chat in chats
-                if chat["id"] == chat_id
-            ),
+            (chat["title"] for chat in chats if chat["id"] == chat_id),
             "ახალი საუბარი"
         ),
         label_visibility="collapsed"
@@ -347,12 +254,10 @@ with st.sidebar:
         st.rerun()
 
     current_chat = next(
-        chat for chat in chats
-        if chat["id"] == st.session_state.active_chat
+        chat for chat in chats if chat["id"] == st.session_state.active_chat
     )
 
     st.divider()
-
     new_title = st.text_input(
         "შეცვალე ჩატის სახელი",
         value=current_chat["title"],
@@ -372,7 +277,6 @@ with st.sidebar:
             st.error("სახელის შენახვა ვერ მოხერხდა.")
 
     st.divider()
-
     if st.button("🗑️ ამ საუბრის წაშლა", use_container_width=True):
         try:
             delete_chat(current_chat["id"])
@@ -382,7 +286,6 @@ with st.sidebar:
             st.error("წაშლა ვერ მოხერხდა.")
 
     st.divider()
-
     st.markdown("### ✨ შესაძლებლობები")
     st.markdown("""
     - 💬 ჭკვიანი საუბარი
@@ -391,7 +294,6 @@ with st.sidebar:
     - 🌍 თარგმნა
     - 🧠 იდეები
     """)
-
     st.divider()
 
     if st.button("🚪 გამოსვლა", use_container_width=True):
@@ -399,17 +301,13 @@ with st.sidebar:
             db.auth.sign_out()
         except Exception:
             pass
-
         clear_login()
         st.rerun()
 
     st.caption("💾 საუბრები ინახება ონლაინ")
     st.caption("🤖 Powered by Groq")
 
-# ==================================
 # MAIN PAGE
-# ==================================
-
 st.markdown("""
 <div class="hero">
     <h1>MyAI Pro</h1>
@@ -419,27 +317,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 chats = load_chats()
-
 current_chat = next(
-    chat for chat in chats
-    if chat["id"] == st.session_state.active_chat
+    chat for chat in chats if chat["id"] == st.session_state.active_chat
 )
 
-# ==================================
 # CHAT HISTORY
-# ==================================
-
 for message in current_chat["messages"]:
-
     avatar = "🤖" if message["role"] == "assistant" else "👤"
-
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# ==================================
 # EXPORT
-# ==================================
-
 chat_text = "\n\n".join(
     f"{message['role'].upper()}:\n{message['content']}"
     for message in current_chat["messages"]
@@ -452,37 +340,20 @@ st.download_button(
     mime="text/plain"
 )
 
-# ==================================
 # GROQ AI
-# ==================================
-
 prompt = st.chat_input("მკითხე ნებისმიერი რამ...")
 
 if prompt:
-
     messages = current_chat["messages"].copy()
-
-    messages.append({
-        "role": "user",
-        "content": prompt
-    })
+    messages.append({"role": "user", "content": prompt})
 
     title = current_chat["title"]
-
     if title == "ახალი საუბარი":
         title = prompt[:35]
 
     try:
-        update_chat(
-            current_chat["id"],
-            title,
-            messages
-        )
-
         with st.spinner("MyAI ფიქრობს..."):
-
             client = Groq(api_key=GROQ_KEY)
-
             response = client.chat.completions.create(
                 model="openai/gpt-oss-20b",
                 messages=[
@@ -501,28 +372,15 @@ if prompt:
                 temperature=0.7,
                 max_tokens=1500
             )
-
             answer = response.choices[0].message.content
 
-        messages.append({
-            "role": "assistant",
-            "content": answer
-        })
-
-        update_chat(
-            current_chat["id"],
-            title,
-            messages
-        )
-
+        messages.append({"role": "assistant", "content": answer})
+        update_chat(current_chat["id"], title, messages)
         st.rerun()
 
     except Exception:
-        st.error(
-            "AI-სთან დაკავშირება ვერ მოხერხდა. "
-            "შეამოწმე Groq API Key და კავშირი."
-        )
-
+        st.error("AI-სთან დაკავშირება ან ჩატის შენახვა ვერ მოხერხდა. შეამოწმე Groq API Key და Supabase.")
+        
 st.markdown(
     "<center><small>MyAI Pro • Built with Python ❤️</small></center>",
     unsafe_allow_html=True
